@@ -184,26 +184,33 @@ function playAnimation() {
   if (isPlaying) return;
   isPlaying = true;
   playPauseBtn.innerHTML = '&#10073;&#10073;'; // Pause icon
-  playInterval = setInterval(() => {
+
+  function advanceFrame() {
+    if (!isPlaying) return;
     let frame = parseInt(slider.value, 10);
     const maxFrame = SCENES[currentSceneIdx].numFrames - 1;
     if (frame < maxFrame) {
       slider.value = frame + 1;
       label.textContent = `Time: ${frame + 1}`;
-      showPointCloudForFrame(frame + 1);
+      showPointCloudForFrame(frame + 1, () => {
+        setTimeout(advanceFrame, 40); // ms per frame (faster)
+      });
     } else {
       // Move to next scene and keep playing
       const nextSceneIdx = (currentSceneIdx + 1) % SCENES.length;
       updateScene(nextSceneIdx);
       // playAnimation() will be called by updateScene if needed
     }
-  }, 40); // ms per frame (faster)
+  }
+
+  // Start advancing from the current frame
+  advanceFrame();
 }
 
 function pauseAnimation() {
   isPlaying = false;
   playPauseBtn.innerHTML = '&#9654;'; // Play icon
-  if (playInterval) clearInterval(playInterval);
+  // No interval to clear anymore
 }
 
 document.addEventListener('DOMContentLoaded', () => {
