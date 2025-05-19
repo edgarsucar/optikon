@@ -21,7 +21,6 @@ let meanTarget = null;
 let isPlaying = false;
 let playInterval = null;
 let slider, label, leftBtn, rightBtn, playPauseBtn;
-let requestVersion = 0;
 
 function initScene() {
   scene = new THREE.Scene();
@@ -116,25 +115,34 @@ function loadPointCloudAndColor(frameIdx, callback) {
     });
 }
 
-function showPointCloudForFrame(frameIdx, onFirstFrameLoaded) {
-  requestVersion++;
-  const thisRequest = requestVersion;
+function preloadSceneFrames(sceneIdx, callback) {
+  const numFrames = SCENES[sceneIdx].numFrames;
+  let loaded = 0;
+  let frames = new Array(numFrames);
+  for (let i = 0; i < numFrames; ++i) {
+    loadPointCloudAndColor(i, (points, colors) => {
+      frames[i] = { points, colors };
+      loaded++;
+      if (loaded === numFrames) {
+        callback(frames);
+      }
+    });
+  }
+}
+
+function showPointCloudForFrame(frameIdx) {
   if (loadedPointClouds[frameIdx]) {
     const { points, colors } = loadedPointClouds[frameIdx];
     createPointCloud(points, colors);
-    if (onFirstFrameLoaded) onFirstFrameLoaded();
   } else {
     loadPointCloudAndColor(frameIdx, (points, colors) => {
-      if (thisRequest !== requestVersion) return;
       loadedPointClouds[frameIdx] = { points, colors };
       createPointCloud(points, colors);
-      if (onFirstFrameLoaded) onFirstFrameLoaded();
     });
   }
 }
 
 function updateScene(newSceneIdx) {
-  requestVersion++;
   const shouldResume = isPlaying;
   pauseAnimation();
   currentSceneIdx = newSceneIdx;
@@ -143,10 +151,19 @@ function updateScene(newSceneIdx) {
   slider.max = numFrames - 1;
   slider.value = 0;
   meanTarget = null;
-  loadedPointClouds = new Array(numFrames).fill(null);
   document.getElementById('loading-overlay').classList.remove('hide');
-  showPointCloudForFrame(0, () => {
+  slider.disabled = true;
+  leftBtn.disabled = true;
+  rightBtn.disabled = true;
+  playPauseBtn.disabled = true;
+  preloadSceneFrames(currentSceneIdx, (frames) => {
+    loadedPointClouds = frames;
     document.getElementById('loading-overlay').classList.add('hide');
+    slider.disabled = false;
+    leftBtn.disabled = false;
+    rightBtn.disabled = false;
+    playPauseBtn.disabled = false;
+    showPointCloudForFrame(0);
     if (shouldResume) playAnimation();
   });
 }
@@ -201,11 +218,20 @@ document.addEventListener('DOMContentLoaded', () => {
   renderer.domElement.addEventListener('pointerdown', hideDragHint, { once: true });
   setTimeout(hideDragHint, 20000);
 
-  // Show loading overlay and load first frame only
+  // Show loading overlay and preload first scene
   document.getElementById('loading-overlay').classList.remove('hide');
-  loadedPointClouds = new Array(SCENES[currentSceneIdx].numFrames).fill(null);
-  showPointCloudForFrame(0, () => {
+  slider.disabled = true;
+  leftBtn.disabled = true;
+  rightBtn.disabled = true;
+  playPauseBtn.disabled = true;
+  preloadSceneFrames(currentSceneIdx, (frames) => {
+    loadedPointClouds = frames;
     document.getElementById('loading-overlay').classList.add('hide');
+    slider.disabled = false;
+    leftBtn.disabled = false;
+    rightBtn.disabled = false;
+    playPauseBtn.disabled = false;
+    showPointCloudForFrame(0);
     playAnimation();
   });
 
@@ -234,4 +260,4 @@ document.addEventListener('DOMContentLoaded', () => {
 
   // Pause animation if user interacts with slider or changes scene
   slider.addEventListener('input', pauseAnimation);
-}); 
+});
